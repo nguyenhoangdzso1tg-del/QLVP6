@@ -1,0 +1,91 @@
+body{
+    margin:0;
+    font-family:Arial, Helvetica, sans-serif;
+    background:linear-gradient(135deg,#686b73,#4b4d52);
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.login-container{
+    width:420px;
+    background:white;
+    padding:40px;
+    border-radius:12px;
+    box-shadow:0 15px 40px rgba(0,0,0,0.2);
+    text-align:center;
+}
+
+.login-container h1{
+    margin-bottom:10px;
+    color:#1e293b;
+}
+
+.sub{
+    color:#64748b;
+    margin-bottom:24px;
+}
+
+.coso-label{
+    text-align:left;
+    font-weight:600;
+    color:#334155;
+    margin-bottom:10px;
+    font-size:15px;
+}
+
+.coso-row{
+    display:flex;
+    gap:10px;
+    margin-bottom:22px;
+}
+
+.coso-btn{
+    flex:1;
+    width:auto;
+    padding:16px 8px;
+    font-size:15px;
+    background:#2563eb;
+    color:white;
+    border:2px solid #2563eb;
+    border-radius:10px;
+    font-weight:bold;
+    cursor:pointer;
+    transition:all .15s;
+}
+
+.coso-btn:hover{
+    background:#1d4ed8;
+    border-color:#1d4ed8;
+}
+
+.coso-btn.selected{
+    background:#64748b !important;
+    border-color:#64748b !important;
+}
+
+.login-container input{
+    width:92%;
+    padding:14px;
+    font-size:16px;
+    border:1px solid #ccc;
+    border-radius:8px;
+    margin-bottom:20px;
+}
+
+.login-container button{
+    width:100%;
+    padding:14px;
+    font-size:16px;
+    background:#2563eb;
+    color:white;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:bold;
+}
+
+.login-container button:hover{
+    background:#4e71d2;
+}

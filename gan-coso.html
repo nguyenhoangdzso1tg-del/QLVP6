@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Gán cơ sở cho dữ liệu cũ</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 20px; }
+    h1 { font-size: 1.2rem; }
+    .note {
+      background: #fff7ed; border: 1px solid #fed7aa; border-left: 4px solid #f59e0b;
+      padding: 12px; border-radius: 8px; font-size: 14px; margin: 12px 0;
+    }
+    button {
+      background: #2563eb; color: white; border: none;
+      padding: 12px 20px; border-radius: 8px; font-size: 15px; cursor: pointer; margin-top: 12px;
+    }
+    button:disabled { background: #94a3b8; cursor: not-allowed; }
+    #log {
+      margin-top: 16px; padding: 12px; background: #f1f5f9;
+      border-radius: 8px; font-size: 14px; white-space: pre-wrap; max-height: 360px; overflow: auto;
+    }
+    .ok { color: #059669; }
+    .err { color: #dc2626; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+    th, td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
+    th { background: #f1f5f9; }
+  </style>
+</head>
+<body>
+  <h1>Gán cơ sở cho dữ liệu cũ (chạy 1 lần)</h1>
+
+  <div class="note">
+    Các vi phạm nhập TRƯỚC khi nâng cấp chưa có "cơ sở" nên không hiện trong Danh sách / Lịch.
+    Trang này tự nhận diện cơ sở theo <b>Khoa</b>:<br>
+    • <b>Chu Văn An</b>: KINH TẾ - NÔNG NGHIỆP, CÔNG NGHỆ THÔNG TIN<br>
+    • <b>Mạc Cửu</b>: CƠ KHÍ - XÂY DỰNG, ĐIỆN - ĐIỆN TỬ, DU LỊCH - NGOẠI NGỮ
+  </div>
+
+  <p><b>Cảnh báo:</b> Bấm "Bắt đầu gán" sẽ ghi thêm trường <code>coso</code> vào các bản ghi cũ. Dữ liệu khác không bị thay đổi.</p>
+
+  <button id="btn">Bắt đầu gán</button>
+  <div id="log">Chưa chạy...</div>
+
+  <script type="module">
+    import { db } from "./firebase.js";
+    import {
+      collection, getDocs, doc, writeBatch
+    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+    const logEl = document.getElementById("log");
+    const btn = document.getElementById("btn");
+
+    const COSOS = {
+      "Chu Văn An": ["KINH TẾ - NÔNG NGHIỆP", "CÔNG NGHỆ THÔNG TIN"],
+      "Mạc Cửu": ["CƠ KHÍ - XÂY DỰNG", "ĐIỆN - ĐIỆN TỬ", "DU LỊCH - NGOẠI NGỮ"]
+    };
+
+    function cosoByKhoa(khoa) {
+      for (const name of Object.keys(COSOS)) {
+        if (COSOS[name].includes(khoa)) return name;
+      }
+      return null;
+    }
+
+    function log(msg, cls = "") {
+      const line = document.createElement("div");
+      if (cls) line.className = cls;
+      line.textContent = msg;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    btn.onclick = async () => {
+      btn.disabled = true;
+      logEl.innerHTML = "";
+      try {
+        log("Đang đọc toàn bộ vi phạm...");
+        const snap = await getDocs(collection(db, "violations"));
+
+        const needing = [];
+        const unknown = [];
+
+        snap.forEach(d => {
+          const v = d.data();
+          if (v.coso) return; // đã có cơ sở rồi
+          const target = cosoByKhoa(v.khoa || "");
+          if (!target) {
+            unknown.push({ id: d.id, hoTen: v.hoTen, khoa: v.khoa, ngay: v.ngay });
+            return;
+          }
+          needing.push({ id: d.id, target, hoTen: v.hoTen, khoa: v.khoa, ngay: v.ngay });
+        });
+
+        if (needing.length === 0 && unknown.length === 0) {
+          log("Không còn bản ghi nào thiếu cơ sở. Xong!", "ok");
+          return;
+        }
+
+        log("Cần gán cơ sở: " + needing.length + " bản ghi");
+        if (unknown.length > 0) {
+          log("⚠️ " + unknown.length + " bản ghi KHÔNG nhận diện được khoa (cần xử lý thủ công):", "err");
+          const tbl = document.createElement("table");
+          tbl.innerHTML = "<tr><th>Tên</th><th>Khoa</th><th>Ngày</th></tr>" +
+            unknown.map(u => `<tr><td>${u.hoTen || ""}</td><td>${u.khoa || "—"}</td><td>${u.ngay || ""}</td></tr>`).join("");
+          logEl.appendChild(tbl);
+        }
+
+        if (needing.length === 0) return;
+
+        if (!confirm("Gán cơ sở cho " + needing.length + " bản ghi cũ?")) return;
+
+        const BATCH = 400;
+        let done = 0;
+        for (let i = 0; i < needing.length; i += BATCH) {
+          const chunk = needing.slice(i, i + BATCH);
+          const batch = writeBatch(db);
+          chunk.forEach(item => {
+            batch.set(doc(db, "violations", item.id), { coso: item.target }, { merge: true });
+          });
+          await batch.commit();
+          done += chunk.length;
+          log("Đã gán: " + done + " / " + needing.length);
+        }
+
+        log("XONG. Đã gán cơ sở cho " + done + " bản ghi cũ.", "ok");
+        log("Giờ mở Danh sách vi phạm / Lịch vi phạm để kiểm tra.", "ok");
+      } catch (e) {
+        console.error(e);
+        log("LỖI: " + (e.message || e), "err");
+        btn.disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>
